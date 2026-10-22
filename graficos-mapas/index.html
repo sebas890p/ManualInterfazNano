@@ -1,0 +1,1644 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Proyecto Nano · Gráficos y Mapas</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+<style>
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    font-family: 'Segoe UI', Arial, sans-serif;
+    background: radial-gradient(ellipse at 50% 0%, #1b0f33 0%, #0a0518 55%, #050310 100%);
+    overflow-x: hidden;
+    position: relative;
+    color: #eafff5;
+  }
+
+  /* ---------- Estrellas de fondo (compartidas por todas las vistas) ---------- */
+  .stars {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+  }
+  .star {
+    position: absolute;
+    background: white;
+    border-radius: 50%;
+    opacity: 0.6;
+    animation: twinkle 3s ease-in-out infinite;
+  }
+  @keyframes twinkle {
+    0%, 100% { opacity: 0.2; transform: scale(1); }
+    50% { opacity: 1; transform: scale(1.4); }
+  }
+
+  .view {
+    position: relative;
+    z-index: 1;
+    min-height: 100vh;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    padding: 40px 20px 60px;
+  }
+  .view.active { display: flex; }
+
+  h1 {
+    font-size: 2rem;
+    margin-bottom: 4px;
+    text-align: center;
+    background: linear-gradient(90deg, #6dffb0, #7ee8ff, #d18bff, #6dffb0);
+    background-size: 300% auto;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    animation: shimmer 4s linear infinite;
+    text-shadow: 0 0 30px rgba(120, 230, 255, 0.25);
+  }
+  @keyframes shimmer {
+    to { background-position: 300% center; }
+  }
+
+  h2.subtitle {
+    font-size: 1.1rem;
+    color: #a99fd6;
+    font-weight: normal;
+    margin-top: 0;
+    margin-bottom: 10px;
+    text-align: center;
+    letter-spacing: 0.5px;
+  }
+
+  p.chart-desc {
+    position: relative;
+    z-index: 1;
+    color: #8f85b8;
+    font-size: 0.85rem;
+    text-align: center;
+    margin-top: 0;
+    margin-bottom: 30px;
+    max-width: 480px;
+  }
+
+  /* ---------- Menú principal ---------- */
+  #view-menu h1 { font-size: 2.4rem; margin-top: 10px; }
+  .menu-sub {
+    color: #a99fd6;
+    margin-bottom: 46px;
+    text-align: center;
+    max-width: 480px;
+  }
+  .menu-cards {
+    display: flex;
+    gap: 26px;
+    flex-wrap: wrap;
+    justify-content: center;
+    max-width: 900px;
+  }
+  .menu-card {
+    width: 240px;
+    padding: 30px 22px;
+    background: linear-gradient(180deg, rgba(30, 15, 60, 0.65), rgba(10, 5, 25, 0.75));
+    border: 1px solid rgba(140, 120, 255, 0.25);
+    border-radius: 18px;
+    box-shadow: 0 0 30px rgba(120, 80, 255, 0.12), inset 0 0 40px rgba(120, 80, 255, 0.05);
+    backdrop-filter: blur(6px);
+    text-align: center;
+    cursor: pointer;
+    transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+  }
+  .menu-card:hover {
+    transform: translateY(-6px);
+    box-shadow: 0 0 40px var(--accent, rgba(160,220,255,0.4));
+    border-color: var(--accent, rgba(160,220,255,0.6));
+  }
+  .menu-card .icon {
+    font-size: 2.6rem;
+    margin-bottom: 14px;
+    filter: drop-shadow(0 0 10px var(--accent, #7ee8ff));
+  }
+  .menu-card .title {
+    font-size: 1.05rem;
+    font-weight: bold;
+    margin-bottom: 6px;
+    color: #fff;
+  }
+  .menu-card .desc {
+    font-size: 0.82rem;
+    color: #b3aad9;
+    line-height: 1.4;
+  }
+
+  /* ---------- Botón volver ---------- */
+  .back-btn {
+    align-self: flex-start;
+    margin: 0 0 20px max(4vw, calc(50% - 340px));
+    padding: 8px 18px;
+    border: 1px solid rgba(160, 150, 255, 0.3);
+    border-radius: 20px;
+    background: rgba(255,255,255,0.04);
+    color: #cfc6ef;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: background 0.2s ease, transform 0.2s ease;
+  }
+  .back-btn:hover {
+    background: rgba(255,255,255,0.1);
+    transform: translateX(-3px);
+  }
+
+  /* ---------- Elementos compartidos por los gráficos ---------- */
+  .chart-wrapper {
+    position: relative;
+    width: min(680px, 94vw);
+  }
+  .chart-container {
+    position: relative;
+    width: 100%;
+    background: linear-gradient(180deg, rgba(30, 15, 60, 0.65), rgba(10, 5, 25, 0.75));
+    border: 1px solid rgba(140, 120, 255, 0.25);
+    border-radius: 18px;
+    box-shadow: 0 0 40px rgba(120, 80, 255, 0.15), inset 0 0 60px rgba(120, 80, 255, 0.06);
+    backdrop-filter: blur(6px);
+    overflow: visible;
+  }
+  .chart-container::before {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 700px;
+    height: 700px;
+    background: conic-gradient(from 0deg, rgba(109,255,176,0.07), rgba(126,232,255,0.07), rgba(209,139,255,0.07), rgba(109,255,176,0.07));
+    animation: spin 18s linear infinite;
+    transform: translate(-50%, -50%);
+    z-index: 0;
+    pointer-events: none;
+    border-radius: 18px;
+  }
+  @keyframes spin {
+    to { transform: translate(-50%, -50%) rotate(360deg); }
+  }
+
+  .gridline {
+    position: absolute;
+    left: 0;
+    right: 0;
+    border-top: 1px dashed rgba(160, 150, 220, 0.18);
+  }
+  .gridline span {
+    position: absolute;
+    left: -30px;
+    top: -9px;
+    font-size: 0.8rem;
+    color: #8f85b8;
+  }
+
+  .action-btn {
+    position: relative;
+    z-index: 1;
+    margin-top: 28px;
+    padding: 12px 26px;
+    border: 1px solid rgba(160, 255, 210, 0.4);
+    border-radius: 30px;
+    background: linear-gradient(90deg, rgba(109,255,176,0.15), rgba(126,232,255,0.15), rgba(209,139,255,0.15));
+    color: #eafff5;
+    font-size: 0.95rem;
+    letter-spacing: 0.5px;
+    cursor: pointer;
+    box-shadow: 0 0 18px rgba(120, 200, 255, 0.25);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+  }
+  .action-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 0 28px rgba(160, 220, 255, 0.45);
+  }
+  .action-btn:active { transform: translateY(0); }
+
+  .hint {
+    margin-top: 10px;
+    font-size: 0.78rem;
+    color: #8f85b8;
+    text-align: center;
+  }
+
+  /* ===================== GRÁFICO DE BARRAS ===================== */
+  #bar-container { height: 360px; padding: 30px 20px 20px 50px; }
+  #bar-gridlines { position: absolute; top: 30px; left: 50px; right: 20px; bottom: 20px; }
+  #bar-bars {
+    position: absolute; top: 30px; left: 50px; right: 20px; bottom: 20px;
+    display: flex; align-items: flex-end; justify-content: space-around; z-index: 2;
+  }
+  .bar-group { display: flex; flex-direction: column; align-items: center; height: 100%; justify-content: flex-end; width: 16%; }
+  .bar {
+    width: 68%; height: 0%; border-radius: 8px 8px 3px 3px; position: relative;
+    transform-origin: bottom center;
+    transition: height 1.4s cubic-bezier(0.22, 1.4, 0.36, 1), filter 0.4s ease, transform 0.4s ease;
+  }
+  .bar.animated { animation: pulse-glow 2.2s ease-in-out infinite 1.4s; }
+  .bar:hover { transform: scaleX(1.12); filter: brightness(1.3); }
+  @keyframes pulse-glow {
+    0%, 100% { filter: drop-shadow(0 0 8px var(--glow)) brightness(1); }
+    50% { filter: drop-shadow(0 0 22px var(--glow)) brightness(1.25); }
+  }
+  .bar::after {
+    content: ""; position: absolute; inset: 0; border-radius: inherit;
+    background: linear-gradient(180deg, rgba(255,255,255,0.35), transparent 60%);
+    opacity: 0; transition: opacity 0.6s ease 1.2s;
+  }
+  .bar.animated::after { opacity: 1; }
+  .bar-particle { position: absolute; bottom: 100%; width: 5px; height: 5px; border-radius: 50%; opacity: 0; pointer-events: none; }
+  .bar-value-label {
+    position: absolute; top: -30px; left: 50%; transform: translateX(-50%) scale(0.5);
+    font-weight: bold; font-size: 1rem; color: #fff;
+    text-shadow: 0 0 10px var(--glow), 0 0 20px var(--glow);
+    opacity: 0; transition: opacity 0.5s ease 1.1s, transform 0.5s cubic-bezier(0.34,1.56,0.64,1) 1.1s;
+    white-space: nowrap;
+  }
+  .bar.animated .bar-value-label { opacity: 1; transform: translateX(-50%) scale(1); }
+  #bar-labelsRow { display: flex; justify-content: space-around; margin-top: 16px; padding: 0 20px 0 50px; }
+  .bar-label {
+    width: 16%; font-size: 0.85rem; color: #cfc6ef; text-align: center;
+    opacity: 0; transform: translateY(8px); transition: opacity 0.6s ease, transform 0.6s ease; letter-spacing: 0.3px;
+  }
+  .bar-label.show { opacity: 1; transform: translateY(0); }
+
+  /* ===================== GRÁFICO DE TORTA ===================== */
+  #view-pie .chart-wrapper { width: min(500px, 92vw); padding: 36px 24px 28px; }
+  .pie-area { position: relative; z-index: 1; display: flex; justify-content: center; align-items: center; }
+  #pie-svg { width: 100%; max-width: 360px; height: auto; overflow: visible; }
+  .pie-orbit {
+    fill: none; stroke: rgba(160, 150, 255, 0.15); stroke-width: 1; stroke-dasharray: 4 8;
+    animation: orbit-spin 12s linear infinite; transform-origin: 200px 200px;
+  }
+  @keyframes orbit-spin { to { transform: rotate(360deg); } }
+  .pie-slice {
+    opacity: 0; transform: scale(0.4); transform-origin: 200px 200px;
+    transition: opacity 0.5s ease, transform 0.7s cubic-bezier(0.34, 1.56, 0.64, 1), filter 0.35s ease;
+    cursor: pointer;
+  }
+  .pie-slice.animated { opacity: 1; transform: scale(1); }
+  .pie-slice:hover { transform: scale(1.06) translate(var(--push-x), var(--push-y)); filter: brightness(1.3) drop-shadow(0 0 18px var(--glow)); }
+  .pie-center-glow { fill: url(#pie-centerGradient); opacity: 0; transition: opacity 1s ease 1.6s; }
+  .pie-center-glow.show { opacity: 1; }
+  .pie-slice-label {
+    font-size: 15px; font-weight: bold; fill: #fff; text-anchor: middle; dominant-baseline: middle;
+    opacity: 0; transform: scale(0.5); transform-box: fill-box; transform-origin: center;
+    transition: opacity 0.5s ease, transform 0.5s cubic-bezier(0.34,1.56,0.64,1);
+    paint-order: stroke; stroke: rgba(0,0,0,0.55); stroke-width: 3px; pointer-events: none; cursor: pointer;
+  }
+  .pie-slice-label.show { opacity: 1; transform: scale(1); }
+  .pie-legend { display: flex; justify-content: center; gap: 22px; flex-wrap: wrap; margin-top: 24px; }
+  .pie-legend-item {
+    display: flex; align-items: center; gap: 8px; font-size: 0.85rem; color: #cfc6ef; cursor: pointer;
+    opacity: 0; transform: translateY(8px); transition: opacity 0.5s ease, transform 0.5s ease;
+  }
+  .pie-legend-item.show { opacity: 1; transform: translateY(0); }
+  .pie-legend-dot { width: 12px; height: 12px; border-radius: 50%; }
+
+  /* ===================== GRÁFICO DE LÍNEAS ===================== */
+  .line-row { display: flex; align-items: stretch; gap: 4px; }
+  .line-axis-title {
+    writing-mode: vertical-rl; transform: rotate(180deg); text-align: center;
+    color: #a99fd6; font-size: 0.85rem; letter-spacing: 0.5px; padding: 10px 2px; white-space: nowrap;
+  }
+  .line-col { flex: 1; min-width: 0; }
+  #line-container { height: 420px; padding: 30px 24px 20px 50px; }
+  #line-gridlines { position: absolute; top: 30px; left: 50px; right: 24px; bottom: 20px; }
+  #line-svg {
+    position: absolute; top: 30px; left: 50px; right: 24px; bottom: 20px;
+    width: calc(100% - 74px); height: calc(100% - 50px); overflow: visible; z-index: 2;
+  }
+  .line-path { fill: none; stroke-width: 4; stroke-linecap: round; stroke-linejoin: round; filter: drop-shadow(0 0 8px rgba(160, 200, 255, 0.5)); }
+  .line-glow-path { fill: none; stroke-width: 10; stroke-linecap: round; stroke-linejoin: round; opacity: 0.25; filter: blur(4px); }
+  .line-point {
+    cursor: pointer; opacity: 0; transform: scale(0); transform-box: fill-box; transform-origin: center;
+    transition: opacity 0.4s ease, transform 0.4s cubic-bezier(0.34,1.56,0.64,1), r 0.2s ease;
+  }
+  .line-point.show { opacity: 1; transform: scale(1); }
+  .line-point:hover { r: 9; filter: drop-shadow(0 0 14px currentColor); }
+  .line-point-pulse { fill: none; stroke-width: 2; opacity: 0; pointer-events: none; }
+  .line-point-pulse.animate { animation: pulse-ring 1.8s ease-out infinite; }
+  @keyframes pulse-ring { 0% { r: 6; opacity: 0.6; } 100% { r: 18; opacity: 0; } }
+  #line-labelsRow { display: flex; justify-content: space-between; margin-top: 14px; padding: 0 24px 0 50px; }
+  .line-label {
+    width: 18%; font-size: 0.78rem; color: #cfc6ef; text-align: center;
+    opacity: 0; transform: translateY(8px); transition: opacity 0.5s ease, transform 0.5s ease; line-height: 1.3;
+  }
+  .line-label.show { opacity: 1; transform: translateY(0); }
+
+  .line-tooltip {
+    position: absolute; z-index: 10; max-width: 220px; padding: 12px 14px;
+    background: rgba(15, 8, 35, 0.95); border: 1px solid rgba(160, 150, 255, 0.35); border-radius: 12px;
+    color: #eafff5; font-size: 0.8rem; line-height: 1.4; pointer-events: none; opacity: 0;
+    transform: translate(-50%, -100%) translateY(-14px) scale(0.9);
+    transition: opacity 0.2s ease, transform 0.2s ease; box-shadow: 0 0 24px rgba(120, 80, 255, 0.35);
+  }
+  .line-tooltip.show { opacity: 1; transform: translate(-50%, -100%) translateY(-20px) scale(1); }
+  .line-tooltip.below { transform: translate(-50%, 0%) translateY(14px) scale(0.9); }
+  .line-tooltip.below.show { transform: translate(-50%, 0%) translateY(20px) scale(1); }
+  .line-tooltip strong { display: block; margin-bottom: 4px; font-size: 0.85rem; }
+  .line-tooltip::after {
+    content: ""; position: absolute; left: 50%; top: 100%; transform: translateX(-50%);
+    border: 7px solid transparent; border-top-color: rgba(15, 8, 35, 0.95);
+  }
+  .line-tooltip.below::after { top: auto; bottom: 100%; border-top-color: transparent; border-bottom-color: rgba(15, 8, 35, 0.95); }
+
+  /* ===================== RADAR (importancia de cada poder) ===================== */
+  #radar-wrapper .chart-container { padding: 30px; display: flex; justify-content: center; }
+  #radar-svg { width: 100%; max-width: 420px; height: auto; overflow: visible; }
+  .radar-grid { fill: none; stroke: rgba(160, 150, 220, 0.22); stroke-width: 1; }
+  .radar-axis { stroke: rgba(160, 150, 220, 0.3); stroke-width: 1; }
+  .radar-axis-label { font-size: 13px; fill: #cfc6ef; text-anchor: middle; font-weight: bold; }
+  .radar-tick-label { font-size: 10px; fill: #8f85b8; text-anchor: middle; }
+  .radar-shape {
+    fill: rgba(126, 232, 255, 0.22); stroke: #7ee8ff; stroke-width: 2.5;
+    stroke-linejoin: round; filter: drop-shadow(0 0 10px rgba(126,232,255,0.6));
+    opacity: 0; transform: scale(0); transform-origin: 210px 200px;
+    transition: opacity 0.8s ease, transform 1s cubic-bezier(0.34,1.56,0.64,1);
+  }
+  .radar-shape.show { opacity: 1; transform: scale(1); }
+  .radar-point {
+    fill: #fff; stroke: #7ee8ff; stroke-width: 2; opacity: 0; transform: scale(0);
+    transform-box: fill-box; transform-origin: center;
+    transition: opacity 0.4s ease, transform 0.4s cubic-bezier(0.34,1.56,0.64,1);
+  }
+  .radar-point.show { opacity: 1; transform: scale(1); }
+  .radar-value-label {
+    font-size: 13px; font-weight: bold; fill: #fff; text-anchor: middle;
+    text-shadow: 0 0 6px #7ee8ff; opacity: 0; transition: opacity 0.5s ease;
+  }
+  .radar-value-label.show { opacity: 1; }
+  .radar-emoji { font-size: 22px; text-anchor: middle; opacity: 0; transition: opacity 0.6s ease; }
+  .radar-emoji.show { opacity: 1; }
+  .radar-note {
+    margin-top: 20px; padding: 14px 18px; border-radius: 12px;
+    background: rgba(126,232,255,0.08); border: 1px solid rgba(126,232,255,0.25);
+    color: #cfc6ef; font-size: 0.85rem; text-align: center; max-width: 460px;
+    opacity: 0; transform: translateY(8px); transition: opacity 0.6s ease, transform 0.6s ease;
+  }
+  .radar-note.show { opacity: 1; transform: translateY(0); }
+
+  /* ===================== DONA (entorno de nano) ===================== */
+  #donut-wrapper .chart-container { padding: 36px 24px 28px; }
+  .donut-area { position: relative; z-index: 1; display: flex; justify-content: center; align-items: center; }
+  #donut-svg { width: 100%; max-width: 340px; height: auto; overflow: visible; }
+  .donut-orbit { fill: none; stroke: rgba(160, 150, 255, 0.15); stroke-width: 1; stroke-dasharray: 4 8; animation: orbit-spin 12s linear infinite; transform-origin: 200px 200px; }
+  @keyframes orbit-spin { to { transform: rotate(360deg); } }
+  .donut-slice {
+    opacity: 0; transform: scale(0.4); transform-origin: 200px 200px;
+    transition: opacity 0.5s ease, transform 0.7s cubic-bezier(0.34, 1.56, 0.64, 1), filter 0.35s ease;
+  }
+  .donut-slice.animated { opacity: 1; transform: scale(1); }
+  .donut-slice:hover { filter: brightness(1.3) drop-shadow(0 0 18px var(--glow)); }
+  .donut-center-icon { font-size: 44px; text-anchor: middle; dominant-baseline: middle; opacity: 0; transition: opacity 1s ease 1.4s; }
+  .donut-center-icon.show { opacity: 1; }
+  .donut-slice-label {
+    font-size: 15px; font-weight: bold; fill: #fff; text-anchor: middle; dominant-baseline: middle;
+    opacity: 0; transform: scale(0.5); transform-box: fill-box; transform-origin: center;
+    transition: opacity 0.5s ease, transform 0.5s cubic-bezier(0.34,1.56,0.64,1);
+    paint-order: stroke; stroke: rgba(0,0,0,0.55); stroke-width: 3px; pointer-events: none;
+  }
+  .donut-slice-label.show { opacity: 1; transform: scale(1); }
+  .donut-legend { display: flex; flex-direction: column; gap: 10px; margin-top: 24px; width: 100%; max-width: 380px; }
+  .donut-legend-item {
+    display: flex; align-items: center; gap: 10px; font-size: 0.85rem; color: #cfc6ef;
+    opacity: 0; transform: translateX(-10px); transition: opacity 0.5s ease, transform 0.5s ease;
+  }
+  .donut-legend-item.show { opacity: 1; transform: translateX(0); }
+  .donut-legend-dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
+  .donut-legend-pct { margin-left: auto; font-weight: bold; color: #fff; }
+
+  /* ===================== BARRAS COMPARATIVAS (antes / después) ===================== */
+  #cmp-wrapper .chart-container { height: 400px; padding: 34px 20px 20px 50px; }
+  #cmp-gridlines { position: absolute; top: 34px; left: 50px; right: 20px; bottom: 20px; }
+  #cmp-bars {
+    position: absolute; top: 34px; left: 50px; right: 20px; bottom: 20px; z-index: 2;
+    display: flex; align-items: flex-end; justify-content: space-around;
+  }
+  .cmp-group { display: flex; flex-direction: column; align-items: center; height: 100%; justify-content: flex-end; width: 26%; }
+  .cmp-bars-pair { display: flex; align-items: flex-end; gap: 8px; height: 100%; }
+  .cmp-bar { width: 34px; height: 0%; border-radius: 6px 6px 2px 2px; position: relative; transition: height 1.3s cubic-bezier(0.22,1.4,0.36,1); }
+  .cmp-bar.antes { background: linear-gradient(180deg, #4d8dff, #2a5fd6); box-shadow: 0 0 12px rgba(77,141,255,0.5); }
+  .cmp-bar.despues { background: linear-gradient(180deg, #ff3c5f, #d61e3d); box-shadow: 0 0 12px rgba(255,60,95,0.5); }
+  .cmp-value-label {
+    position: absolute; top: -26px; left: 50%; transform: translateX(-50%) scale(0.5);
+    font-weight: bold; font-size: 0.9rem; color: #fff; opacity: 0;
+    transition: opacity 0.5s ease 1s, transform 0.5s cubic-bezier(0.34,1.56,0.64,1) 1s; white-space: nowrap;
+  }
+  .cmp-bar.animated .cmp-value-label { opacity: 1; transform: translateX(-50%) scale(1); }
+  #cmp-labelsRow { display: flex; justify-content: space-around; margin-top: 16px; padding: 0 20px 0 50px; }
+  .cmp-label { width: 26%; font-size: 0.85rem; color: #cfc6ef; text-align: center; opacity: 0; transform: translateY(8px); transition: opacity 0.6s ease, transform 0.6s ease; }
+  .cmp-label.show { opacity: 1; transform: translateY(0); }
+  .gridline { position: absolute; left: 0; right: 0; border-top: 1px dashed rgba(160, 150, 220, 0.18); }
+  .gridline span { position: absolute; left: -30px; top: -9px; font-size: 0.8rem; color: #8f85b8; }
+  .cmp-legend { display: flex; gap: 26px; justify-content: center; margin-top: 6px; }
+  .cmp-legend-item { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; color: #cfc6ef; }
+  .cmp-legend-dot { width: 12px; height: 12px; border-radius: 4px; }
+
+  /* ===================== MAPAS (compartido) ===================== */
+  .legend {
+    position: relative; z-index: 1;
+    display: flex; flex-wrap: wrap; gap: 14px;
+    justify-content: center;
+    margin-bottom: 20px;
+    max-width: 700px;
+  }
+  .legend-item {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 0.82rem; color: #cfc6ef;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(160,150,255,0.18);
+    padding: 6px 14px;
+    border-radius: 20px;
+  }
+  .legend-icon {
+    width: 22px; height: 22px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; flex-shrink: 0;
+    border: 2px solid rgba(255,255,255,0.6);
+    box-shadow: 0 0 8px var(--glow);
+  }
+  .legend-dot {
+    width: 16px; height: 16px; border-radius: 50%;
+    box-shadow: 0 0 8px currentColor;
+    flex-shrink: 0;
+  }
+  .map-wrapper {
+    position: relative; z-index: 1;
+    width: min(760px, 96vw);
+    border: 1px solid rgba(140, 120, 255, 0.3);
+    border-radius: 18px;
+    box-shadow: 0 0 40px rgba(120, 80, 255, 0.2);
+    overflow: hidden;
+  }
+  .leaflet-map { width: 100%; height: 520px; background: #0a0518; }
+  .aroma-marker {
+    width: 28px; height: 28px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 15px;
+    border: 2px solid rgba(255,255,255,0.85);
+    box-shadow: 0 0 14px var(--glow), 0 0 4px rgba(0,0,0,0.5);
+    animation: marker-pulse 2.4s ease-in-out infinite;
+  }
+  @keyframes marker-pulse { 0%, 100% { box-shadow: 0 0 10px var(--glow); } 50% { box-shadow: 0 0 22px var(--glow); } }
+  .home-marker {
+    width: 32px; height: 32px; border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 17px;
+    background: rgba(15,8,35,0.9);
+    border: 2px solid #4dff8f;
+    box-shadow: 0 0 16px #4dff8f;
+  }
+  .leaflet-popup-content-wrapper {
+    background: rgba(15, 8, 35, 0.95); color: #eafff5;
+    border: 1px solid rgba(160, 150, 255, 0.4); border-radius: 12px;
+    box-shadow: 0 0 24px rgba(120, 80, 255, 0.4);
+  }
+  .leaflet-popup-tip { background: rgba(15, 8, 35, 0.95); }
+  .leaflet-popup-content { margin: 12px 14px; font-size: 0.85rem; line-height: 1.4; }
+  .leaflet-popup-content strong { display: block; margin-bottom: 4px; font-size: 0.95rem; }
+  .leaflet-container a.leaflet-popup-close-button { color: #cfc6ef; }
+
+
+  .menu-section-label {
+    color: #8f85b8;
+    font-size: 0.9rem;
+    letter-spacing: 0.5px;
+    margin: 30px 0 16px;
+    text-align: center;
+  }
+  .menu-cards + .menu-section-label { margin-top: 40px; }
+
+
+  /* --- Parche para el programa Agente Nano: modo incrustado --- */
+  html.embed .back-btn { display: none !important; }
+</style>
+</head>
+<body>
+
+<div class="stars" id="stars"></div>
+
+<!-- ================= MENÚ PRINCIPAL ================= -->
+<section id="view-menu" class="view active">
+  <h1>👽 Proyecto Nano</h1>
+  <p class="menu-sub">Elige el gráfico o mapa que quieres ver. Cada uno tiene su propia animación.</p>
+
+  <p class="menu-section-label">📊 Gráficos</p>
+  <div class="menu-cards">
+    <div class="menu-card" style="--accent:#39ff6a" onclick="showView('bars')">
+      <div class="icon">📊</div>
+      <div class="title">1. Gráfico de barras</div>
+      <div class="desc">Aromas que percibe Nano</div>
+    </div>
+    <div class="menu-card" style="--accent:#0091ff" onclick="showView('pie')">
+      <div class="icon">🥧</div>
+      <div class="title">2. Gráfico de torta</div>
+      <div class="desc">Poderes de Nano</div>
+    </div>
+    <div class="menu-card" style="--accent:#a24bff" onclick="showView('line')">
+      <div class="icon">📈</div>
+      <div class="title">3. Gráfico de líneas</div>
+      <div class="desc">Evolución de la historia de Nano</div>
+    </div>
+    <div class="menu-card" style="--accent:#7ee8ff" onclick="showView('radar')">
+      <div class="icon">🕸️</div>
+      <div class="title">4. Gráfico de radar</div>
+      <div class="desc">Nivel de importancia de cada poder</div>
+    </div>
+    <div class="menu-card" style="--accent:#8dff5c" onclick="showView('donut')">
+      <div class="icon">🍩</div>
+      <div class="title">5. Gráfico de dona</div>
+      <div class="desc">Elementos del entorno de Nano</div>
+    </div>
+    <div class="menu-card" style="--accent:#ff3c5f" onclick="showView('cmp')">
+      <div class="icon">📊</div>
+      <div class="title">6. Gráfico de barras comparativas</div>
+      <div class="desc">Antes y después de los poderes</div>
+    </div>
+  </div>
+
+  <p class="menu-section-label">🗺️ Cartografías</p>
+  <div class="menu-cards">
+    <div class="menu-card" style="--accent:#4dff8f" onclick="showView('mapaolores')">
+      <div class="icon">🐹</div>
+      <div class="title">Mapa de ubicación</div>
+      <div class="desc">Ubicaciones de los olores que detecta Nano</div>
+    </div>
+    <div class="menu-card" style="--accent:#ff3c3c" onclick="showView('mapaenemigos')">
+      <div class="icon">👾</div>
+      <div class="title">Mapa coroplético</div>
+      <div class="desc">Cantidad de enemigos por zona</div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= VISTA: BARRAS ================= -->
+<section id="view-bars" class="view">
+  <button class="back-btn" onclick="showView('menu')">← Volver al menú</button>
+  <h1>👽 1. Gráfico de barras</h1>
+  <h2 class="subtitle">Aromas que percibe Nano</h2>
+  <p class="chart-desc">Cuántas veces percibe Nano cada aroma en su entorno, en una escala del 0 al 6.</p>
+  <div class="chart-wrapper">
+    <div class="chart-container" id="bar-container">
+      <div id="bar-gridlines"></div>
+      <div id="bar-bars"></div>
+    </div>
+    <div id="bar-labelsRow"></div>
+  </div>
+  <button class="action-btn" onclick="animateBars()">🛸 Reproducir animación</button>
+</section>
+
+
+<!-- ================= VISTA: TORTA ================= -->
+<section id="view-pie" class="view">
+  <button class="back-btn" onclick="showView('menu')">← Volver al menú</button>
+  <h1>👽 2. Gráfico de torta</h1>
+  <h2 class="subtitle">Poderes de Nano</h2>
+  <p class="chart-desc">Distribución porcentual de cada uno de los poderes que obtuvo Nano.</p>
+  <div class="chart-wrapper">
+    <div class="pie-area">
+      <svg viewBox="0 0 400 400" id="pie-svg">
+        <defs>
+          <radialGradient id="pie-centerGradient" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stop-color="#ffffff" stop-opacity="0.35"/>
+            <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+          </radialGradient>
+        </defs>
+        <circle class="pie-orbit" cx="200" cy="200" r="175"/>
+        <circle class="pie-orbit" cx="200" cy="200" r="188" style="animation-direction: reverse; animation-duration: 20s;"/>
+        <g id="pie-slicesGroup"></g>
+        <circle class="pie-center-glow" id="pie-centerGlow" cx="200" cy="200" r="60"/>
+        <g id="pie-labelsGroup"></g>
+      </svg>
+    </div>
+    <div class="pie-legend" id="pie-legend"></div>
+  </div>
+  <button class="action-btn" onclick="animatePie()">🛸 Reproducir animación</button>
+  <div class="hint">Haz clic en una porción para ver más detalle ✨</div>
+</section>
+
+
+<!-- ================= VISTA: LÍNEAS ================= -->
+<section id="view-line" class="view">
+  <button class="back-btn" onclick="showView('menu')">← Volver al menú</button>
+  <h1>👽 3. Gráfico de líneas</h1>
+  <h2 class="subtitle">Evolución de la Historia de Nano</h2>
+  <p class="chart-desc">Nivel de evolución de Nano a través de los momentos clave de su historia.</p>
+  <div class="chart-wrapper">
+    <div class="line-row">
+      <div class="line-axis-title">Nivel de evolución</div>
+      <div class="line-col">
+        <div class="chart-container" id="line-container">
+          <div id="line-gridlines"></div>
+          <svg class="line-plot" id="line-svg" viewBox="0 0 600 340" preserveAspectRatio="none">
+            <defs>
+              <linearGradient id="line-lineGradient" gradientUnits="userSpaceOnUse">
+                <stop offset="0%"  stop-color="#8dff5c"/>
+                <stop offset="30%" stop-color="#ffb03c"/>
+                <stop offset="55%" stop-color="#4d8dff"/>
+                <stop offset="100%" stop-color="#a24bff"/>
+              </linearGradient>
+            </defs>
+            <path class="line-glow-path" id="line-glowPath" stroke="url(#line-lineGradient)"/>
+            <path class="line-path" id="line-linePath" stroke="url(#line-lineGradient)"/>
+            <g id="line-pointsGroup"></g>
+          </svg>
+        </div>
+        <div id="line-labelsRow"></div>
+      </div>
+    </div>
+  </div>
+  <div class="line-tooltip" id="line-tooltip"></div>
+  <button class="action-btn" onclick="animateLine()">🛸 Reproducir animación</button>
+  <div class="hint">Pasa el mouse sobre cada punto para ver más información ✨</div>
+</section>
+
+
+<!-- ================= VISTA: RADAR ================= -->
+<section id="view-radar" class="view">
+  <button class="back-btn" onclick="showView('menu')">← Volver al menú</button>
+  <h1>👽 4. Gráfico de radar</h1>
+  <h2 class="subtitle">Escala del 1 al 10</h2>
+  <p class="desc">Según qué tan importante es cada poder para la misión de Nano</p>
+  <div class="chart-wrapper" id="radar-wrapper">
+    <div class="chart-container">
+      <svg id="radar-svg" viewBox="0 0 420 400"></svg>
+    </div>
+  </div>
+  <div class="radar-note" id="radar-note">El superolfato es el poder más importante, seguido de la superfuerza y la hipervelocidad.</div>
+  <button class="action-btn" onclick="animateRadar()">🛸 Reproducir animación</button>
+</section>
+
+
+<!-- ================= VISTA: DONA ================= -->
+<section id="view-donut" class="view">
+  <button class="back-btn" onclick="showView('menu')">← Volver al menú</button>
+  <h1>👽 5. Gráfico de dona</h1>
+  <h2 class="subtitle">¿Qué elementos rodean a Nano y en qué proporción?</h2>
+  <p class="desc">Distribución porcentual de los elementos que Nano encuentra en su entorno diario.</p>
+  <div class="chart-wrapper" id="donut-wrapper">
+    <div class="chart-container">
+      <div class="donut-area">
+        <svg viewBox="0 0 400 400" id="donut-svg">
+          <circle class="donut-orbit" cx="200" cy="200" r="185"/>
+          <g id="donut-slicesGroup"></g>
+          <text class="donut-center-icon" id="donut-centerIcon" x="200" y="205">🐹</text>
+          <g id="donut-labelsGroup"></g>
+        </svg>
+      </div>
+      <div class="donut-legend" id="donut-legend"></div>
+    </div>
+  </div>
+  <button class="action-btn" onclick="animateDonut()">🛸 Reproducir animación</button>
+</section>
+
+
+<!-- ================= VISTA: COMPARATIVO ================= -->
+<section id="view-cmp" class="view">
+  <button class="back-btn" onclick="showView('menu')">← Volver al menú</button>
+  <h1>👽 6. Gráfico de barras comparativas</h1>
+  <h2 class="subtitle">Comparación de habilidades antes y después de los poderes</h2>
+  <p class="desc">Nivel de olfato, velocidad y fuerza de Nano, comparado antes y después de obtener sus poderes.</p>
+  <div class="cmp-legend">
+    <div class="cmp-legend-item"><span class="cmp-legend-dot" style="background:#4d8dff"></span> Antes</div>
+    <div class="cmp-legend-item"><span class="cmp-legend-dot" style="background:#ff3c5f"></span> Después</div>
+  </div>
+  <div class="chart-wrapper" id="cmp-wrapper" style="margin-top:16px;">
+    <div class="chart-container">
+      <div id="cmp-gridlines"></div>
+      <div id="cmp-bars"></div>
+    </div>
+    <div id="cmp-labelsRow"></div>
+  </div>
+  <button class="action-btn" onclick="animateCmp()">🛸 Reproducir animación</button>
+</section>
+
+
+<!-- ================= VISTA: MAPA DE OLORES ================= -->
+<section id="view-mapaolores" class="view">
+  <button class="back-btn" onclick="showView('menu')">← Volver al menú</button>
+  <h1>🐹 Mapa de ubicación</h1>
+  <h2 class="subtitle">Mapa de las ubicaciones de los olores que detecta Nano</h2>
+  <div class="legend" id="legend-olores"></div>
+  <div class="map-wrapper">
+    <div id="map-olores" class="leaflet-map"></div>
+  </div>
+  <div class="hint">Haz clic en cada marcador para ver más información 🛸</div>
+</section>
+
+<!-- ================= VISTA: MAPA DE ENEMIGOS ================= -->
+<section id="view-mapaenemigos" class="view">
+  <button class="back-btn" onclick="showView('menu')">← Volver al menú</button>
+  <h1>👾 Mapa coroplético</h1>
+  <h2 class="subtitle">Mapa de cantidad de enemigos por zonas</h2>
+  <div class="legend" id="legend-enemigos"></div>
+  <div class="map-wrapper">
+    <div id="map-enemigos" class="leaflet-map"></div>
+  </div>
+  <div class="hint">Haz clic en cada zona o en la casa de Nano para ver más información 🛸</div>
+</section>
+
+<script>
+  /* ========================================================= */
+  /*  NAVEGACIÓN ENTRE VISTAS                                    */
+  /* ========================================================= */
+  function showView(name) {
+    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+    document.getElementById('view-' + name).classList.add('active');
+    window.scrollTo({ top: 0, behavior: 'instant' });
+
+    if (name === 'bars') animateBars();
+    if (name === 'pie') animatePie();
+    if (name === 'line') animateLine();
+    if (name === 'radar') animateRadar();
+    if (name === 'donut') animateDonut();
+    if (name === 'cmp') animateCmp();
+    if (name === 'mapaolores') initMapaOlores();
+    if (name === 'mapaenemigos') initMapaEnemigos();
+  }
+
+  /* ========================================================= */
+  /*  ESTRELLAS DE FONDO (compartidas)                           */
+  /* ========================================================= */
+  const starsContainer = document.getElementById('stars');
+  for (let i = 0; i < 90; i++) {
+    const star = document.createElement('div');
+    star.className = 'star';
+    const size = Math.random() * 2 + 1;
+    star.style.width = size + 'px';
+    star.style.height = size + 'px';
+    star.style.top = Math.random() * 100 + '%';
+    star.style.left = Math.random() * 100 + '%';
+    star.style.animationDelay = (Math.random() * 3) + 's';
+    star.style.animationDuration = (2 + Math.random() * 3) + 's';
+    starsContainer.appendChild(star);
+  }
+
+
+  /* ========================================================= */
+  /*  GRÁFICO DE BARRAS                                          */
+  /* ========================================================= */
+  (function () {
+    const data = [
+      { label: "Pan",           value: 3, color: "#6dffb0" },
+      { label: "Aves",          value: 2, color: "#7ee8ff" },
+      { label: "Tomate",        value: 6, color: "#ff5fb0" },
+      { label: "Humanos",       value: 4, color: "#d18bff" },
+      { label: "Olor extraño",  value: 1, color: "#ffe45f" },
+    ];
+    const maxValue = 6;
+    const barsContainer = document.getElementById('bar-bars');
+    const gridContainer = document.getElementById('bar-gridlines');
+    const labelsRow = document.getElementById('bar-labelsRow');
+
+    for (let i = 0; i <= maxValue; i++) {
+      const line = document.createElement('div');
+      line.className = 'gridline';
+      line.style.bottom = (i / maxValue * 100) + '%';
+      line.innerHTML = `<span>${i}</span>`;
+      gridContainer.appendChild(line);
+    }
+
+    data.forEach((d) => {
+      const group = document.createElement('div');
+      group.className = 'bar-group';
+      const bar = document.createElement('div');
+      bar.className = 'bar';
+      bar.style.background = `linear-gradient(180deg, ${d.color}, ${d.color}cc)`;
+      bar.style.setProperty('--glow', d.color);
+      bar.style.height = '0%';
+      bar.dataset.target = (d.value / maxValue * 100);
+      bar.dataset.color = d.color;
+
+      const valueLabel = document.createElement('div');
+      valueLabel.className = 'bar-value-label';
+      valueLabel.style.setProperty('--glow', d.color);
+      valueLabel.textContent = d.value;
+      bar.appendChild(valueLabel);
+
+      group.appendChild(bar);
+      barsContainer.appendChild(group);
+    });
+
+    data.forEach((d) => {
+      const label = document.createElement('div');
+      label.className = 'bar-label';
+      label.textContent = d.label;
+      labelsRow.appendChild(label);
+    });
+
+    function spawnParticles(bar, color) {
+      for (let i = 0; i < 6; i++) {
+        setTimeout(() => {
+          const p = document.createElement('div');
+          p.className = 'bar-particle';
+          p.style.background = color;
+          p.style.boxShadow = `0 0 6px ${color}, 0 0 12px ${color}`;
+          p.style.left = (30 + Math.random() * 40) + '%';
+          bar.appendChild(p);
+          const drift = (Math.random() - 0.5) * 40;
+          const rise = 60 + Math.random() * 60;
+          p.animate([
+            { transform: 'translate(0,0)', opacity: 0 },
+            { transform: `translate(${drift * 0.4}px, -${rise * 0.5}px)`, opacity: 1, offset: 0.3 },
+            { transform: `translate(${drift}px, -${rise}px)`, opacity: 0 }
+          ], { duration: 1800 + Math.random() * 800, easing: 'ease-out' });
+          setTimeout(() => p.remove(), 2600);
+        }, i * 220);
+      }
+    }
+
+    let barParticleIntervals = [];
+
+    window.animateBars = function () {
+      const bars = document.querySelectorAll('#bar-bars .bar');
+      const labels = document.querySelectorAll('.bar-label');
+
+      barParticleIntervals.forEach(clearInterval);
+      barParticleIntervals = [];
+
+      bars.forEach(b => {
+        b.style.height = '0%';
+        b.classList.remove('animated');
+        b.querySelectorAll('.bar-particle').forEach(p => p.remove());
+      });
+      labels.forEach(l => l.classList.remove('show'));
+
+      setTimeout(() => {
+        bars.forEach((bar, i) => {
+          setTimeout(() => {
+            bar.style.height = bar.dataset.target + '%';
+            bar.classList.add('animated');
+            labels[i].classList.add('show');
+            setTimeout(() => {
+              spawnParticles(bar, bar.dataset.color);
+              barParticleIntervals.push(setInterval(() => spawnParticles(bar, bar.dataset.color), 2600));
+            }, 1450);
+          }, i * 180);
+        });
+      }, 150);
+    };
+  })();
+
+
+  /* ========================================================= */
+  /*  GRÁFICO DE TORTA                                           */
+  /* ========================================================= */
+  (function () {
+    const data = [
+      { label: "Super fuerza",   value: 33, color: "#ff2e2e" },
+      { label: "Hipervelocidad", value: 34, color: "#39ff6a" },
+      { label: "Super olfato",   value: 33, color: "#0091ff" },
+    ];
+
+    const cx = 200, cy = 200, r = 150;
+    const slicesGroup = document.getElementById('pie-slicesGroup');
+    const labelsGroup = document.getElementById('pie-labelsGroup');
+    const legend = document.getElementById('pie-legend');
+    const centerGlow = document.getElementById('pie-centerGlow');
+
+    function polarToCartesian(angleDeg, radius) {
+      const rad = (angleDeg - 90) * Math.PI / 180;
+      return { x: cx + radius * Math.cos(rad), y: cy + radius * Math.sin(rad) };
+    }
+    function buildSlicePath(startAngle, endAngle) {
+      const start = polarToCartesian(endAngle, r);
+      const end = polarToCartesian(startAngle, r);
+      const largeArc = endAngle - startAngle > 180 ? 1 : 0;
+      return `M ${cx} ${cy} L ${start.x} ${start.y} A ${r} ${r} 0 ${largeArc} 0 ${end.x} ${end.y} Z`;
+    }
+
+    function openSliceInfo(d) {
+      const win = window.open('', '_blank');
+      if (!win) { alert('Tu navegador bloqueó la ventana emergente. Permite pop-ups para ver el detalle.'); return; }
+      win.document.write(`
+        <!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>${d.label} · Nano</title>
+        <style>
+          body { margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center;
+                 font-family:'Segoe UI',Arial,sans-serif;
+                 background: radial-gradient(ellipse at 50% 0%, #1b0f33 0%, #0a0518 55%, #050310 100%);
+                 color:#eafff5; text-align:center; padding:40px; box-sizing:border-box; }
+          .card { border:1px solid ${d.color}66; border-radius:18px; padding:44px 36px;
+                   background:rgba(255,255,255,0.03); box-shadow:0 0 50px ${d.color}55; max-width:420px; }
+          .badge { display:inline-block; font-size:3rem; font-weight:bold; color:${d.color};
+                    text-shadow:0 0 20px ${d.color}, 0 0 40px ${d.color}88; margin-bottom:14px; }
+          h1 { font-size:1.3rem; font-weight:normal; color:#cfc6ef; line-height:1.5; margin:0; }
+          strong { color:#fff; }
+        </style></head><body>
+          <div class="card"><div class="badge">${d.value}%</div>
+          <h1>Nano está conformado por <strong>${d.value}%</strong> de<br><strong>${d.label}</strong>.</h1></div>
+        </body></html>
+      `);
+      win.document.close();
+    }
+
+    let cumulativeAngle = 0;
+    const sliceEls = [], labelEls = [];
+
+    data.forEach((d) => {
+      const angle = (d.value / 100) * 360;
+      const startAngle = cumulativeAngle;
+      const endAngle = cumulativeAngle + angle;
+      const midAngle = (startAngle + endAngle) / 2;
+
+      const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      path.setAttribute('d', buildSlicePath(startAngle, endAngle));
+      path.setAttribute('fill', d.color);
+      path.setAttribute('stroke', '#0a0518');
+      path.setAttribute('stroke-width', '3');
+      path.classList.add('pie-slice');
+      path.style.setProperty('--glow', d.color);
+      const mid = polarToCartesian(midAngle, 1);
+      path.style.setProperty('--push-x', (mid.x - cx) * 0.06 + 'px');
+      path.style.setProperty('--push-y', (mid.y - cy) * 0.06 + 'px');
+      path.addEventListener('click', () => openSliceInfo(d));
+      slicesGroup.appendChild(path);
+      sliceEls.push(path);
+
+      const labelPos = polarToCartesian(midAngle, r * 0.62);
+      const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      text.setAttribute('x', labelPos.x);
+      text.setAttribute('y', labelPos.y);
+      text.classList.add('pie-slice-label');
+      text.textContent = d.value + '%';
+      text.addEventListener('click', () => openSliceInfo(d));
+      labelsGroup.appendChild(text);
+      labelEls.push(text);
+
+      cumulativeAngle = endAngle;
+    });
+
+    data.forEach((d) => {
+      const item = document.createElement('div');
+      item.className = 'pie-legend-item';
+      item.innerHTML = `<span class="pie-legend-dot" style="background:${d.color}; box-shadow:0 0 8px ${d.color}"></span> ${d.label}`;
+      item.addEventListener('click', () => openSliceInfo(d));
+      legend.appendChild(item);
+    });
+
+    function spawnCenterParticles() {
+      const svg = document.getElementById('pie-svg');
+      data.forEach((d, i) => {
+        for (let p = 0; p < 3; p++) {
+          setTimeout(() => {
+            const angle = Math.random() * 360;
+            const dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+            dot.setAttribute('cx', cx); dot.setAttribute('cy', cy); dot.setAttribute('r', 3);
+            dot.setAttribute('fill', d.color);
+            dot.style.filter = `drop-shadow(0 0 6px ${d.color})`;
+            svg.appendChild(dot);
+            const end = polarToCartesian(angle, r + 40 + Math.random() * 20);
+            const anim = dot.animate([
+              { transform: 'translate(0px,0px)', opacity: 0 },
+              { transform: `translate(${(end.x-cx)*0.5}px, ${(end.y-cy)*0.5}px)`, opacity: 1, offset: 0.3 },
+              { transform: `translate(${end.x-cx}px, ${end.y-cy}px)`, opacity: 0 }
+            ], { duration: 1600 + Math.random()*600, easing: 'ease-out' });
+            anim.onfinish = () => dot.remove();
+          }, i * 300 + p * 150);
+        }
+      });
+    }
+
+    let pieParticleInterval = null;
+
+    window.animatePie = function () {
+      sliceEls.forEach(s => s.classList.remove('animated'));
+      labelEls.forEach(l => l.classList.remove('show'));
+      centerGlow.classList.remove('show');
+      document.querySelectorAll('.pie-legend-item').forEach(l => l.classList.remove('show'));
+      if (pieParticleInterval) clearInterval(pieParticleInterval);
+
+      setTimeout(() => {
+        sliceEls.forEach((slice, i) => {
+          setTimeout(() => {
+            slice.classList.add('animated');
+            setTimeout(() => labelEls[i].classList.add('show'), 350);
+          }, i * 250);
+        });
+        const legendItems = document.querySelectorAll('.pie-legend-item');
+        legendItems.forEach((item, i) => {
+          setTimeout(() => item.classList.add('show'), sliceEls.length * 250 + 300 + i * 150);
+        });
+        setTimeout(() => {
+          centerGlow.classList.add('show');
+          spawnCenterParticles();
+          pieParticleInterval = setInterval(spawnCenterParticles, 3200);
+        }, sliceEls.length * 250 + 400);
+      }, 150);
+    };
+  })();
+
+
+  /* ========================================================= */
+  /*  GRÁFICO DE LÍNEAS                                          */
+  /* ========================================================= */
+  (function () {
+    const data = [
+      { label: "Vida Normal", value: 1, color: "#8dff5c", info: "Nano vive como cualquier persona común, sin saber lo que está por llegar." },
+      { label: "Olor extraño", value: 2, color: "#d9d15c", info: "Empieza a percibir olores imposibles de explicar. La primera señal de que algo cambió en él." },
+      { label: "Aparición de la luz", value: 3, color: "#ff9a3c", info: "Una luz misteriosa aparece frente a él, marcando el inicio de su transformación." },
+      { label: "Obtiene poderes", value: 5, color: "#4d8dff", info: "Sus sentidos se disparan: consigue súper fuerza, hipervelocidad y súper olfato." },
+      { label: "Descubre que fue elegido", value: 5, color: "#a24bff", info: "Entiende que nada fue un accidente: fue elegido para algo mucho más grande." },
+    ];
+
+    const maxValue = 5;
+    const plotW = 600, plotH = 340, padX = 20;
+
+    const gridContainer = document.getElementById('line-gridlines');
+    const labelsRow = document.getElementById('line-labelsRow');
+    const linePath = document.getElementById('line-linePath');
+    const glowPath = document.getElementById('line-glowPath');
+    const pointsGroup = document.getElementById('line-pointsGroup');
+    const tooltip = document.getElementById('line-tooltip');
+    const chartContainer = document.getElementById('line-container');
+    const gradient = document.getElementById('line-lineGradient');
+
+    for (let i = 0; i <= maxValue; i++) {
+      const line = document.createElement('div');
+      line.className = 'gridline';
+      line.style.bottom = (i / maxValue * 100) + '%';
+      line.innerHTML = `<span>${i}</span>`;
+      gridContainer.appendChild(line);
+    }
+
+    const step = (plotW - padX * 2) / (data.length - 1);
+    const points = data.map((d, i) => ({ ...d, x: padX + step * i, y: plotH - (d.value / maxValue) * plotH }));
+
+    gradient.setAttribute('x1', points[0].x);
+    gradient.setAttribute('x2', points[points.length - 1].x);
+    gradient.setAttribute('y1', 0);
+    gradient.setAttribute('y2', 0);
+
+    const pathD = points.map((p, i) => (i === 0 ? 'M' : 'L') + ` ${p.x} ${p.y}`).join(' ');
+    linePath.setAttribute('d', pathD);
+    glowPath.setAttribute('d', pathD);
+
+    const pointEls = [];
+    points.forEach((p) => {
+      const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+      const pulse = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      pulse.setAttribute('cx', p.x); pulse.setAttribute('cy', p.y); pulse.setAttribute('r', 6);
+      pulse.setAttribute('stroke', p.color);
+      pulse.classList.add('line-point-pulse');
+
+      const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      circle.setAttribute('cx', p.x); circle.setAttribute('cy', p.y); circle.setAttribute('r', 7);
+      circle.setAttribute('fill', p.color);
+      circle.setAttribute('stroke', '#0a0518');
+      circle.setAttribute('stroke-width', '2');
+      circle.style.color = p.color;
+      circle.classList.add('line-point');
+
+      circle.addEventListener('mouseenter', () => showLineTooltip(p));
+      circle.addEventListener('mouseleave', hideLineTooltip);
+      circle.addEventListener('click', () => showLineTooltip(p));
+
+      g.appendChild(pulse); g.appendChild(circle);
+      pointsGroup.appendChild(g);
+      pointEls.push({ circle, pulse });
+    });
+
+    data.forEach((d) => {
+      const label = document.createElement('div');
+      label.className = 'line-label';
+      label.textContent = d.label;
+      labelsRow.appendChild(label);
+    });
+
+    function showLineTooltip(p) {
+      const svgRect = document.getElementById('line-svg').getBoundingClientRect();
+      const containerRect = chartContainer.getBoundingClientRect();
+      const scaleX = svgRect.width / plotW;
+      const scaleY = svgRect.height / plotH;
+      const left = (svgRect.left - containerRect.left) + p.x * scaleX;
+      const top = (svgRect.top - containerRect.top) + p.y * scaleY;
+      const showBelow = top < 110;
+      tooltip.classList.toggle('below', showBelow);
+      tooltip.innerHTML = `<strong style="color:${p.color}">${p.label} · Nivel ${p.value}</strong>${p.info}`;
+      tooltip.style.left = left + 'px';
+      tooltip.style.top = top + 'px';
+      tooltip.classList.add('show');
+    }
+    function hideLineTooltip() { tooltip.classList.remove('show'); }
+
+    window.animateLine = function () {
+      hideLineTooltip();
+      const totalLength = linePath.getTotalLength();
+      [linePath, glowPath].forEach(p => {
+        p.style.transition = 'none';
+        p.style.strokeDasharray = totalLength;
+        p.style.strokeDashoffset = totalLength;
+      });
+      pointEls.forEach(({ circle, pulse }) => { circle.classList.remove('show'); pulse.classList.remove('animate'); });
+      document.querySelectorAll('.line-label').forEach(l => l.classList.remove('show'));
+
+      void linePath.getBoundingClientRect();
+
+      requestAnimationFrame(() => {
+        [linePath, glowPath].forEach(p => {
+          p.style.transition = 'stroke-dashoffset 1.8s cubic-bezier(0.65, 0, 0.35, 1)';
+          p.style.strokeDashoffset = '0';
+        });
+        pointEls.forEach(({ circle, pulse }, i) => {
+          const delay = 1800 * (i / (pointEls.length - 1));
+          setTimeout(() => {
+            circle.classList.add('show');
+            pulse.classList.add('animate');
+            document.querySelectorAll('.line-label')[i].classList.add('show');
+          }, delay);
+        });
+      });
+    };
+
+    window.addEventListener('resize', hideLineTooltip);
+  })();
+
+  /*  RADAR — Nivel de importancia de cada poder                 */
+  /* ========================================================= */
+  (function () {
+    const data = [
+      { label: "Superolfato",   emoji: "👃", value: 10 },
+      { label: "Superfuerza",   emoji: "💪", value: 9 },
+      { label: "Hipervelocidad",emoji: "⚡", value: 8 },
+    ];
+    const maxValue = 10;
+    const cx = 210, cy = 200, r = 140;
+    const svg = document.getElementById('radar-svg');
+    const n = data.length;
+
+    function pointAt(index, value) {
+      const angle = (Math.PI * 2 * index / n) - Math.PI / 2;
+      const radius = (value / maxValue) * r;
+      return { x: cx + radius * Math.cos(angle), y: cy + radius * Math.sin(angle) };
+    }
+
+    // rejilla (anillos concéntricos)
+    [0.25, 0.5, 0.75, 1].forEach((frac) => {
+      const pts = data.map((d, i) => pointAt(i, maxValue * frac));
+      const poly = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+      poly.setAttribute('points', pts.map(p => `${p.x},${p.y}`).join(' '));
+      poly.classList.add('radar-grid');
+      svg.appendChild(poly);
+    });
+
+    // ejes + etiquetas de eje + emoji
+    const emojiEls = [];
+    data.forEach((d, i) => {
+      const outer = pointAt(i, maxValue);
+      const axis = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      axis.setAttribute('x1', cx); axis.setAttribute('y1', cy);
+      axis.setAttribute('x2', outer.x); axis.setAttribute('y2', outer.y);
+      axis.classList.add('radar-axis');
+      svg.appendChild(axis);
+
+      const labelPos = pointAt(i, maxValue * 1.28);
+      const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      label.setAttribute('x', labelPos.x);
+      label.setAttribute('y', labelPos.y);
+      label.classList.add('radar-axis-label');
+      label.textContent = d.label.toUpperCase();
+      svg.appendChild(label);
+
+      const emojiPos = pointAt(i, maxValue * 1.05);
+      const emoji = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      emoji.setAttribute('x', emojiPos.x);
+      emoji.setAttribute('y', labelPos.y + 20);
+      emoji.classList.add('radar-emoji');
+      emoji.textContent = d.emoji;
+      svg.appendChild(emoji);
+      emojiEls.push(emoji);
+    });
+
+    // figura (polígono relleno)
+    const shapePoints = data.map((d, i) => pointAt(i, d.value));
+    const shape = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+    shape.setAttribute('points', shapePoints.map(p => `${p.x},${p.y}`).join(' '));
+    shape.classList.add('radar-shape');
+    svg.appendChild(shape);
+
+    // puntos + valores
+    const pointEls = [], valueEls = [];
+    data.forEach((d, i) => {
+      const p = shapePoints[i];
+      const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      circle.setAttribute('cx', p.x); circle.setAttribute('cy', p.y); circle.setAttribute('r', 6);
+      circle.classList.add('radar-point');
+      svg.appendChild(circle);
+      pointEls.push(circle);
+
+      const valuePos = pointAt(i, d.value + 1.3);
+      const valLabel = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      valLabel.setAttribute('x', valuePos.x);
+      valLabel.setAttribute('y', valuePos.y);
+      valLabel.classList.add('radar-value-label');
+      valLabel.textContent = d.value;
+      svg.appendChild(valLabel);
+      valueEls.push(valLabel);
+    });
+
+    window.animateRadar = function () {
+      shape.classList.remove('show');
+      pointEls.forEach(p => p.classList.remove('show'));
+      valueEls.forEach(v => v.classList.remove('show'));
+      emojiEls.forEach(e => e.classList.remove('show'));
+      document.getElementById('radar-note').classList.remove('show');
+
+      setTimeout(() => {
+        shape.classList.add('show');
+        setTimeout(() => {
+          pointEls.forEach((p, i) => setTimeout(() => {
+            p.classList.add('show');
+            valueEls[i].classList.add('show');
+            emojiEls[i].classList.add('show');
+          }, i * 150));
+        }, 500);
+        setTimeout(() => document.getElementById('radar-note').classList.add('show'), 1200);
+      }, 150);
+    };
+  })();
+
+
+  /* ========================================================= */
+  (function () {
+    const data = [
+      { label: "Árboles y plantas",         value: 30, color: "#8dff5c", icon: "🌳" },
+      { label: "Pan y comida",              value: 25, color: "#ffd23c", icon: "🍞" },
+      { label: "Aves",                      value: 20, color: "#4d8dff", icon: "🐦" },
+      { label: "Personas",                  value: 15, color: "#ff5f8d", icon: "🧍" },
+      { label: "Tiendas (como la de tomates)", value: 10, color: "#a24bff", icon: "🏪" },
+    ];
+
+    const cx = 200, cy = 200, rOuter = 150, rInner = 88;
+    const slicesGroup = document.getElementById('donut-slicesGroup');
+    const labelsGroup = document.getElementById('donut-labelsGroup');
+    const legend = document.getElementById('donut-legend');
+    const centerIcon = document.getElementById('donut-centerIcon');
+
+    function polarToCartesian(angleDeg, radius) {
+      const rad = (angleDeg - 90) * Math.PI / 180;
+      return { x: cx + radius * Math.cos(rad), y: cy + radius * Math.sin(rad) };
+    }
+    function buildDonutPath(startAngle, endAngle) {
+      const outerStart = polarToCartesian(endAngle, rOuter);
+      const outerEnd = polarToCartesian(startAngle, rOuter);
+      const innerEnd = polarToCartesian(startAngle, rInner);
+      const innerStart = polarToCartesian(endAngle, rInner);
+      const largeArc = endAngle - startAngle > 180 ? 1 : 0;
+      return [
+        `M ${outerStart.x} ${outerStart.y}`,
+        `A ${rOuter} ${rOuter} 0 ${largeArc} 0 ${outerEnd.x} ${outerEnd.y}`,
+        `L ${innerEnd.x} ${innerEnd.y}`,
+        `A ${rInner} ${rInner} 0 ${largeArc} 1 ${innerStart.x} ${innerStart.y}`,
+        'Z'
+      ].join(' ');
+    }
+
+    let cumulativeAngle = 0;
+    const sliceEls = [], labelEls = [];
+
+    data.forEach((d) => {
+      const angle = (d.value / 100) * 360;
+      const startAngle = cumulativeAngle;
+      const endAngle = cumulativeAngle + angle;
+      const midAngle = (startAngle + endAngle) / 2;
+
+      const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      path.setAttribute('d', buildDonutPath(startAngle, endAngle));
+      path.setAttribute('fill', d.color);
+      path.setAttribute('stroke', '#0a0518');
+      path.setAttribute('stroke-width', '3');
+      path.classList.add('donut-slice');
+      path.style.setProperty('--glow', d.color);
+      slicesGroup.appendChild(path);
+      sliceEls.push(path);
+
+      const labelPos = polarToCartesian(midAngle, (rOuter + rInner) / 2);
+      const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      text.setAttribute('x', labelPos.x);
+      text.setAttribute('y', labelPos.y);
+      text.classList.add('donut-slice-label');
+      text.textContent = d.value + '%';
+      labelsGroup.appendChild(text);
+      labelEls.push(text);
+
+      cumulativeAngle = endAngle;
+    });
+
+    data.forEach((d) => {
+      const item = document.createElement('div');
+      item.className = 'donut-legend-item';
+      item.innerHTML = `<span class="donut-legend-dot" style="background:${d.color}; box-shadow:0 0 8px ${d.color}"></span> ${d.icon} ${d.label} <span class="donut-legend-pct">${d.value}%</span>`;
+      legend.appendChild(item);
+    });
+
+    window.animateDonut = function () {
+      sliceEls.forEach(s => s.classList.remove('animated'));
+      labelEls.forEach(l => l.classList.remove('show'));
+      centerIcon.classList.remove('show');
+      document.querySelectorAll('.donut-legend-item').forEach(l => l.classList.remove('show'));
+
+      setTimeout(() => {
+        sliceEls.forEach((slice, i) => {
+          setTimeout(() => {
+            slice.classList.add('animated');
+            setTimeout(() => labelEls[i].classList.add('show'), 350);
+          }, i * 220);
+        });
+        setTimeout(() => centerIcon.classList.add('show'), sliceEls.length * 220 + 300);
+
+        const legendItems = document.querySelectorAll('.donut-legend-item');
+        legendItems.forEach((item, i) => {
+          setTimeout(() => item.classList.add('show'), i * 140);
+        });
+      }, 150);
+    };
+  })();
+
+
+  /* ========================================================= */
+  (function () {
+    const data = [
+      { label: "Olfato",    antes: 3, despues: 10 },
+      { label: "Velocidad", antes: 2, despues: 9 },
+      { label: "Fuerza",    antes: 2, despues: 9 },
+    ];
+    const maxValue = 10;
+    const barsContainer = document.getElementById('cmp-bars');
+    const gridContainer = document.getElementById('cmp-gridlines');
+    const labelsRow = document.getElementById('cmp-labelsRow');
+
+    for (let i = 0; i <= maxValue; i += 2) {
+      const line = document.createElement('div');
+      line.className = 'gridline';
+      line.style.bottom = (i / maxValue * 100) + '%';
+      line.innerHTML = `<span>${i}</span>`;
+      gridContainer.appendChild(line);
+    }
+
+    const barPairs = [];
+    data.forEach((d) => {
+      const group = document.createElement('div');
+      group.className = 'cmp-group';
+      const pair = document.createElement('div');
+      pair.className = 'cmp-bars-pair';
+
+      const antesBar = document.createElement('div');
+      antesBar.className = 'cmp-bar antes';
+      antesBar.dataset.target = (d.antes / maxValue * 100);
+      const antesLabel = document.createElement('div');
+      antesLabel.className = 'cmp-value-label';
+      antesLabel.textContent = d.antes;
+      antesBar.appendChild(antesLabel);
+
+      const despuesBar = document.createElement('div');
+      despuesBar.className = 'cmp-bar despues';
+      despuesBar.dataset.target = (d.despues / maxValue * 100);
+      const despuesLabel = document.createElement('div');
+      despuesLabel.className = 'cmp-value-label';
+      despuesLabel.textContent = d.despues;
+      despuesBar.appendChild(despuesLabel);
+
+      pair.appendChild(antesBar);
+      pair.appendChild(despuesBar);
+      group.appendChild(pair);
+      barsContainer.appendChild(group);
+      barPairs.push({ antesBar, despuesBar });
+
+      const label = document.createElement('div');
+      label.className = 'cmp-label';
+      label.textContent = d.label;
+      labelsRow.appendChild(label);
+    });
+
+    window.animateCmp = function () {
+      const allBars = document.querySelectorAll('.cmp-bar');
+      allBars.forEach(b => { b.style.height = '0%'; b.classList.remove('animated'); });
+      document.querySelectorAll('.cmp-label').forEach(l => l.classList.remove('show'));
+
+      setTimeout(() => {
+        barPairs.forEach((pair, i) => {
+          setTimeout(() => {
+            pair.antesBar.style.height = pair.antesBar.dataset.target + '%';
+            pair.antesBar.classList.add('animated');
+            setTimeout(() => {
+              pair.despuesBar.style.height = pair.despuesBar.dataset.target + '%';
+              pair.despuesBar.classList.add('animated');
+            }, 200);
+            document.querySelectorAll('.cmp-label')[i].classList.add('show');
+          }, i * 250);
+        });
+      }, 150);
+    };
+  })();
+
+  /* ========================================================= */
+  /*  MAPA DE OLORES DE NANO                                      */
+  /* ========================================================= */
+  let mapaOloresInstance = null;
+
+  function initMapaOlores() {
+    if (mapaOloresInstance) {
+      setTimeout(() => mapaOloresInstance.invalidateSize(), 50);
+      return;
+    }
+
+    const parkCenter = [6.24587, -75.59347];
+
+    const smellPoints = [
+      {
+        label: "Olor extraño",
+        color: "#ccff33",
+        icon: "⚠️",
+        coords: [6.24587, -75.59347],
+        info: "Justo en el centro del parque, Nano percibe por primera vez un olor imposible de explicar."
+      },
+      {
+        label: "Aves",
+        color: "#4d8dff",
+        icon: "🐦",
+        coords: [6.245466, -75.592766],
+        info: "Cerca de Circular 4, al oriente del parque, las aves sobrevuelan constantemente."
+      },
+      {
+        label: "Humanos",
+        color: "#d18bff",
+        icon: "🧍",
+        coords: [6.244888, -75.594647],
+        info: "Al suroccidente del parque, donde más gente camina y se sienta, Nano percibe el aroma característico de las personas."
+      },
+      {
+        label: "Tomates",
+        color: "#ff5f3c",
+        icon: "🍅",
+        coords: [6.244182, -75.594088],
+        info: "Al sur del parque hay una tienda que vende tomates frescos — el aroma favorito de Nano."
+      },
+    ];
+
+    const nanoHome = {
+      coords: [6.24447, -75.592657],
+      info: "La casa de Nano, al suroriente del parque, muy cerca de todo lo que le rodea."
+    };
+
+    const map = L.map('map-olores', { scrollWheelZoom: false }).setView(parkCenter, 17);
+    mapaOloresInstance = map;
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+      maxZoom: 20
+    }).addTo(map);
+
+    smellPoints.forEach((p) => {
+      const icon = L.divIcon({
+        className: '',
+        html: `<div class="aroma-marker" style="background:${p.color}33; --glow:${p.color}; border-color:${p.color}">${p.icon}</div>`,
+        iconSize: [28, 28],
+        iconAnchor: [14, 14],
+        popupAnchor: [0, -14]
+      });
+      L.marker(p.coords, { icon }).addTo(map).bindPopup(
+        `<strong style="color:${p.color}">${p.icon} ${p.label}</strong>${p.info}`
+      );
+    });
+
+    const homeIcon = L.divIcon({
+      className: '',
+      html: `<div class="home-marker">🏠</div>`,
+      iconSize: [32, 32],
+      iconAnchor: [16, 16],
+      popupAnchor: [0, -16]
+    });
+    L.marker(nanoHome.coords, { icon: homeIcon }).addTo(map).bindPopup(
+      `<strong style="color:#4dff8f">🏠 Casa de Nano</strong>${nanoHome.info}`
+    );
+
+    const legend = document.getElementById('legend-olores');
+    const legendItems = [
+      { label: "Casa de Nano", color: "#4dff8f", icon: "🏠" },
+      ...smellPoints
+    ];
+    legendItems.forEach((p) => {
+      const item = document.createElement('div');
+      item.className = 'legend-item';
+      item.innerHTML = `<span class="legend-icon" style="background:${p.color}33; border-color:${p.color}; --glow:${p.color}">${p.icon}</span> ${p.label}`;
+      legend.appendChild(item);
+    });
+
+    setTimeout(() => map.invalidateSize(), 50);
+  }
+
+  /* ========================================================= */
+  /*  MAPA DE ENEMIGOS                                            */
+  /* ========================================================= */
+  let mapaEnemigosInstance = null;
+
+  function initMapaEnemigos() {
+    if (mapaEnemigosInstance) {
+      setTimeout(() => mapaEnemigosInstance.invalidateSize(), 50);
+      return;
+    }
+
+    const parkCenter = [6.24587, -75.59347];
+
+    const enemyZones = [
+      {
+        label: "Mayor cantidad de enemigos",
+        color: "#ff3c3c",
+        radius: 100,
+        coords: [6.24587, -75.59347],
+        info: "En el centro del parque se concentra la banda de ratones malvados — la mayor cantidad de enemigos de toda la zona."
+      },
+      {
+        label: "Poca cantidad de enemigos",
+        color: "#ffd23c",
+        radius: 45,
+        coords: [6.247137, -75.593007],
+        info: "Al norte del parque, cerca de La Salchipapería, solo se ven algunos ratones vigilando de vez en cuando."
+      },
+      {
+        label: "No hay enemigos",
+        color: "#4dff8f",
+        radius: 40,
+        coords: [6.244700, -75.594457],
+        info: "Al suroccidente, cerca de Crepes & Waffles, la zona está tranquila — no se ha detectado ningún enemigo."
+      },
+    ];
+
+    const nanoHome = {
+      coords: [6.24447, -75.592657],
+      info: "La casa de Nano, al suroriente del parque, cerca de la zona de mayor peligro."
+    };
+
+    const map = L.map('map-enemigos', { scrollWheelZoom: false }).setView(parkCenter, 17);
+    mapaEnemigosInstance = map;
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+      maxZoom: 20
+    }).addTo(map);
+
+    enemyZones.forEach((z) => {
+      L.circle(z.coords, {
+        radius: z.radius,
+        color: z.color,
+        weight: 2,
+        fillColor: z.color,
+        fillOpacity: 0.55
+      }).addTo(map).bindPopup(
+        `<strong style="color:${z.color}">${z.label}</strong>${z.info}`
+      );
+    });
+
+    const homeIcon = L.divIcon({
+      className: '',
+      html: `<div class="home-marker">🏠</div>`,
+      iconSize: [32, 32],
+      iconAnchor: [16, 16],
+      popupAnchor: [0, -16]
+    });
+    L.marker(nanoHome.coords, { icon: homeIcon }).addTo(map).bindPopup(
+      `<strong style="color:#4dff8f">🏠 Casa de Nano</strong>${nanoHome.info}`
+    );
+
+    const legend = document.getElementById('legend-enemigos');
+
+    const homeItem = document.createElement('div');
+    homeItem.className = 'legend-item';
+    homeItem.innerHTML = `<span class="legend-icon" style="background:#4dff8f33; border-color:#4dff8f; --glow:#4dff8f">🏠</span> Casa de Nano`;
+    legend.appendChild(homeItem);
+
+    enemyZones.forEach((z) => {
+      const item = document.createElement('div');
+      item.className = 'legend-item';
+      item.innerHTML = `<span class="legend-dot" style="background:${z.color}; color:${z.color}"></span> ${z.label}`;
+      legend.appendChild(item);
+    });
+
+    setTimeout(() => map.invalidateSize(), 50);
+  }
+</script>
+
+
+<script>
+  /* --- Parche para el programa Agente Nano ---
+     Permite abrir una vista directamente con la URL: index.html#bars, #pie, #mapaolores...
+     y oculta "Volver al menú" cuando la página está dentro del programa (iframe). */
+  (function () {
+    if (window.self !== window.top) document.documentElement.classList.add('embed');
+    function abrirDesdeHash() {
+      var nombre = location.hash.replace('#', '');
+      if (nombre && document.getElementById('view-' + nombre)) showView(nombre);
+    }
+    window.addEventListener('hashchange', abrirDesdeHash);
+    abrirDesdeHash();
+  })();
+</script>
+
+</body>
+</html>

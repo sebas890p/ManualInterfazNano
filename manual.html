@@ -1,0 +1,257 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agente Nano · Manual de usuario</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bangers&family=Baloo+2:wght@400;600;800&family=Patrick+Hand&display=swap">
+<style>
+  /* ===== Lenguaje gráfico de Agente Nano ===== */
+  :root {
+    --noche: #0A0518;  --panel: #17123A;  --panel-2: #211A4D;  --linea: #2c2460;
+    --lavanda: #CFC6EF; --tenue: #8F85B8; --blanco: #FFFFFF;
+    --violeta: #7A4DF0; --azul: #49A6FF; --dorado: #D2A63F;
+    --verde: #4DFF8F;  --rojo: #FF3C5F;  --metal: #AEB3C0;
+    --titulos: 'Bangers', 'Impact', sans-serif;
+    --texto: 'Baloo 2', 'Trebuchet MS', sans-serif;
+    --mano: 'Patrick Hand', 'Comic Neue', cursive;
+    --radio: 16px;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0; background: var(--noche); color: var(--lavanda);
+    font-family: var(--texto); font-size: 18px; line-height: 1.55;
+    background-image:
+      radial-gradient(1.5px 1.5px at 12% 18%, #fff8 50%, transparent 51%),
+      radial-gradient(1px 1px at 72% 9%, #fff7 50%, transparent 51%),
+      radial-gradient(1.5px 1.5px at 88% 42%, #fff6 50%, transparent 51%),
+      radial-gradient(1px 1px at 35% 64%, #fff6 50%, transparent 51%),
+      radial-gradient(1px 1px at 5% 92%, #fff6 50%, transparent 51%);
+    background-size: 640px 640px;
+  }
+  a { color: var(--azul); }
+  a:focus-visible { outline: 3px solid var(--azul); outline-offset: 3px; }
+  h1, h2 { font-family: var(--titulos); font-weight: 400; letter-spacing: 1.5px; color: var(--blanco); margin: 0; }
+  h1 { font-size: clamp(56px, 10vw, 104px); line-height: .95; }
+  h2 { font-size: clamp(38px, 6vw, 60px); line-height: 1; }
+  h3 { font-weight: 800; font-size: 15px; letter-spacing: 3px; text-transform: uppercase; color: var(--dorado); margin: 0 0 18px; }
+  p { margin: 0; }
+  .env { max-width: 1040px; margin: 0 auto; padding: 0 20px; }
+
+  .barra { position: sticky; top: 0; z-index: 10; background: rgba(10,5,24,.85); backdrop-filter: blur(8px); border-bottom: 1px solid var(--linea); }
+  .barra .env { display: flex; align-items: center; gap: 24px; min-height: 64px; flex-wrap: wrap; }
+  .marca { font-family: var(--titulos); font-size: 26px; letter-spacing: 1.5px; color: var(--blanco); text-decoration: none; }
+  .marca span { color: var(--violeta); }
+  .barra nav { display: flex; gap: 20px; flex: 1; }
+  .barra nav a { color: var(--lavanda); text-decoration: none; font-weight: 600; font-size: 16px; }
+  .barra nav a:hover { color: var(--azul); }
+
+  .btn { display: inline-flex; align-items: center; gap: 10px; min-height: 48px; padding: 0 22px; border-radius: 12px;
+    font-family: var(--texto); font-weight: 800; font-size: 18px; text-decoration: none; border: 2px solid transparent; }
+  .btn.principal { background: var(--violeta); color: var(--blanco); }
+  .btn.principal:hover { box-shadow: 0 6px 24px rgba(122,77,240,.45); }
+  .btn.secundario { color: var(--lavanda); border-color: var(--lavanda); }
+  .barra .btn { min-height: 40px; font-size: 16px; padding: 0 16px; margin-left: auto; }
+
+  .portada { padding: 80px 20px 40px; }
+  .portada .sobre { font-weight: 800; font-size: 14px; letter-spacing: 3px; color: var(--dorado); }
+  .portada p { max-width: 560px; font-size: 21px; margin-top: 18px; }
+
+  section { padding: 56px 20px; }
+  .titulo-sec { display: flex; align-items: baseline; gap: 14px; margin-bottom: 40px; }
+  .titulo-sec .n { font-family: var(--titulos); font-size: 28px; color: var(--violeta); }
+  .bloque { margin-bottom: 64px; }
+  .nota { display: block; color: var(--tenue); font-size: 15px; margin-top: 12px; }
+
+  /* concepto */
+  .concepto { font-size: clamp(22px, 3vw, 28px); line-height: 1.35; color: var(--blanco); max-width: 760px; }
+  .concepto em { font-style: normal; color: var(--azul); }
+
+  /* tipografía */
+  .tipos { display: grid; gap: 16px; grid-template-columns: 1.3fr 1fr 1fr; }
+  .tipo { background: var(--panel); border: 1px solid var(--linea); border-radius: var(--radio); padding: 24px; display: flex; flex-direction: column; gap: 10px; }
+  .tipo .aa { color: var(--blanco); line-height: 1; }
+  .tipo b { color: var(--blanco); font-size: 17px; }
+  .tipo small { color: var(--tenue); font-size: 15px; }
+
+  /* color */
+  .paleta { display: grid; gap: 12px; grid-template-columns: repeat(4, 1fr); }
+  .muestra { border-radius: var(--radio); overflow: hidden; border: 1px solid var(--linea); background: var(--panel); }
+  .muestra i { display: block; height: 90px; }
+  .muestra div { padding: 10px 14px 12px; font-size: 15px; }
+  .muestra b { display: block; color: var(--blanco); font-size: 16px; }
+  .muestra code { font-family: var(--texto); color: var(--tenue); }
+  .muestra.grande { grid-column: span 2; }
+  .muestra.grande i { height: 150px; }
+  .proporcion { display: flex; height: 18px; border-radius: 9px; overflow: hidden; margin-top: 20px; }
+
+  /* íconos y componentes */
+  .dos { display: grid; gap: 16px; grid-template-columns: 1fr 1fr; }
+  .caja { background: var(--panel); border: 1px solid var(--linea); border-radius: var(--radio); padding: 24px; }
+  .iconos { display: flex; gap: 22px; flex-wrap: wrap; }
+  .iconos figure { margin: 0; text-align: center; font-size: 14px; color: var(--tenue); }
+  .iconos svg { display: block; width: 40px; height: 40px; margin: 0 auto 6px; color: var(--blanco); }
+  .demo { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+  .demo + .demo { margin-top: 14px; }
+  .seg { display: inline-flex; border: 2px solid var(--lavanda); border-radius: 12px; overflow: hidden; font-weight: 800; }
+  .seg span { padding: 8px 16px; }
+  .seg .on { background: var(--lavanda); color: var(--noche); }
+  .etq { padding: 2px 12px; border-radius: 8px; background: var(--panel-2); border: 1.5px solid var(--azul); color: var(--blanco); font-weight: 600; }
+  input[type=range] { accent-color: var(--azul); flex: 1; min-width: 140px; }
+
+  /* fondo */
+  .cielo { height: 200px; border-radius: var(--radio); position: relative; overflow: hidden; border: 1px solid var(--linea);
+    background: radial-gradient(circle at 70% 40%, rgba(122,77,240,.45), transparent 45%),
+                radial-gradient(circle at 25% 70%, rgba(73,166,255,.3), transparent 40%), var(--noche); }
+  .cielo .aro { position: absolute; left: 50%; top: 50%; width: 140px; height: 140px; transform: translate(-50%,-50%); border-radius: 50%; border: 6px solid var(--dorado); }
+  .cielo .nucleo { position: absolute; left: 50%; top: 50%; width: 100px; height: 100px; transform: translate(-50%,-50%); border-radius: 50%;
+    background: radial-gradient(circle, #fff 0 12%, var(--azul) 35%, var(--violeta) 68%, transparent 70%); box-shadow: 0 0 40px rgba(73,166,255,.6); }
+  .cielo i { position: absolute; width: 3px; height: 3px; border-radius: 50%; background: #fff; opacity: .8; }
+
+  /* uso */
+  .pasos { display: grid; gap: 16px; grid-template-columns: repeat(3, 1fr); margin-bottom: 48px; }
+  .pasos div { border-top: 3px solid var(--violeta); padding-top: 14px; }
+  .pasos b { display: block; color: var(--blanco); font-size: 20px; }
+  .modos { list-style: none; padding: 0; margin: 0; display: grid; gap: 0 32px; grid-template-columns: 1fr 1fr; }
+  .modos li { display: flex; gap: 14px; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--linea); }
+  .modos svg { width: 28px; height: 28px; flex: none; color: var(--azul); }
+  .modos b { color: var(--blanco); }
+
+  footer { padding: 32px 20px 48px; border-top: 1px solid var(--linea); color: var(--tenue); font-size: 15px; }
+
+  @media (max-width: 800px) {
+    .tipos, .pasos, .dos, .modos { grid-template-columns: 1fr; }
+    .paleta { grid-template-columns: 1fr 1fr; }
+    .barra nav { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<header class="barra">
+  <div class="env">
+    <a class="marca" href="index.html">Agente <span>Nano</span></a>
+    <nav><a href="#lenguaje">Lenguaje gráfico</a><a href="#uso">Cómo se usa</a></nav>
+    <a class="btn principal" href="index.html">Abrir programa</a>
+  </div>
+</header>
+
+<main>
+  <div class="portada env">
+    <span class="sobre">MANUAL DE USUARIO</span>
+    <h1>La rueda de<br>recuperación cósmica</h1>
+    <p>Cómo se ve y cómo se usa el programa del artefacto de Nano.</p>
+  </div>
+
+  <!-- ===== 01 LENGUAJE GRÁFICO ===== -->
+  <section id="lenguaje" class="env">
+    <div class="titulo-sec"><span class="n">01</span><h2>Lenguaje gráfico</h2></div>
+
+    <div class="bloque">
+      <h3>Concepto</h3>
+      <p class="concepto">Un cómic de ciencia ficción: <em>noche espacial</em>, energía violeta y azul, metal con detalles dorados. Títulos que gritan, textos que se leen fácil.</p>
+    </div>
+
+    <div class="bloque">
+      <h3>Tipografía</h3>
+      <div class="tipos">
+        <div class="tipo">
+          <span class="aa" style="font-family:var(--titulos);font-size:96px;letter-spacing:2px">Aa</span>
+          <b style="font-family:var(--titulos);font-size:26px;letter-spacing:1px">Bangers</b>
+          <small>Títulos y números grandes. Frases cortas, nunca en párrafos.</small>
+        </div>
+        <div class="tipo">
+          <span class="aa" style="font-family:var(--texto);font-weight:800;font-size:80px">Aa</span>
+          <b>Baloo 2</b>
+          <small>Texto, botones y etiquetas. Regular para leer, ExtraBold para destacar.</small>
+        </div>
+        <div class="tipo">
+          <span class="aa" style="font-family:var(--mano);font-size:80px">Aa</span>
+          <b style="font-family:var(--mano);font-size:20px">Patrick Hand</b>
+          <small>Notas a mano y bocetos. Solo para el estilo wireframe.</small>
+        </div>
+      </div>
+    </div>
+
+    <div class="bloque">
+      <h3>Color</h3>
+      <div class="paleta">
+        <div class="muestra grande"><i style="background:var(--noche);border-bottom:1px solid var(--linea)"></i><div><b>Noche</b><code>#0A0518</code> · fondo</div></div>
+        <div class="muestra grande"><i style="background:var(--violeta)"></i><div><b>Violeta</b><code>#7A4DF0</code> · acción principal</div></div>
+        <div class="muestra"><i style="background:var(--azul)"></i><div><b>Azul</b><code>#49A6FF</code> · energía, foco</div></div>
+        <div class="muestra"><i style="background:var(--dorado)"></i><div><b>Dorado</b><code>#D2A63F</code> · detalles</div></div>
+        <div class="muestra"><i style="background:var(--panel)"></i><div><b>Panel</b><code>#17123A</code> · superficies</div></div>
+        <div class="muestra"><i style="background:var(--lavanda)"></i><div><b>Lavanda</b><code>#CFC6EF</code> · texto</div></div>
+        <div class="muestra"><i style="background:var(--metal)"></i><div><b>Metal</b><code>#AEB3C0</code> · piezas</div></div>
+        <div class="muestra"><i style="background:var(--verde)"></i><div><b>Verde</b><code>#4DFF8F</code> · olores, éxito</div></div>
+        <div class="muestra"><i style="background:var(--rojo)"></i><div><b>Rojo</b><code>#FF3C5F</code> · enemigos, error</div></div>
+        <div class="muestra"><i style="background:var(--blanco)"></i><div><b>Blanco</b><code>#FFFFFF</code> · títulos</div></div>
+      </div>
+      <div class="proporcion" aria-hidden="true">
+        <i style="flex:60;background:var(--noche);border:1px solid var(--linea)"></i><i style="flex:20;background:var(--panel)"></i><i style="flex:10;background:var(--violeta)"></i><i style="flex:6;background:var(--azul)"></i><i style="flex:4;background:var(--dorado)"></i>
+      </div>
+      <span class="nota">Proporción de uso: mucha noche, poco acento. El violeta va en una sola acción por pantalla.</span>
+    </div>
+
+    <div class="bloque dos">
+      <div class="caja">
+        <h3>Íconos</h3>
+        <div class="iconos">
+          <figure><svg viewBox="0 0 26 26"><ellipse cx="13" cy="13" rx="7" ry="11" fill="none" stroke="currentColor" stroke-width="2"/><path d="M13 3 V23 M13 13 H19" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>General</figure>
+          <figure><svg viewBox="0 0 26 26"><rect x="3" y="3" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"/><rect x="9" y="9" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="3 2"/></svg>Transparencia</figure>
+          <figure><svg viewBox="0 0 26 26"><circle cx="11" cy="11" r="7.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M16.5 16.5 L23 23" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>Acercar</figure>
+          <figure><svg viewBox="0 0 26 26"><path d="M13 3 A10 10 0 0 1 13 23 Z" fill="currentColor" fill-opacity=".3"/><circle cx="13" cy="13" r="10" fill="none" stroke="currentColor" stroke-width="2"/><path d="M13 1 V25" stroke="currentColor" stroke-width="2" stroke-dasharray="3 2"/></svg>Corte</figure>
+          <figure><svg viewBox="0 0 26 26"><rect x="2" y="7" width="5" height="12" fill="none" stroke="currentColor" stroke-width="2"/><rect x="10.5" y="4" width="5" height="18" fill="none" stroke="currentColor" stroke-width="2"/><rect x="19" y="7" width="5" height="12" fill="none" stroke="currentColor" stroke-width="2"/></svg>Despiece</figure>
+          <figure><svg viewBox="0 0 26 26"><path d="M15 2 L6 15 H12 L10 24 L20 10 H14 Z" fill="#D2A63F"/></svg>Logo</figure>
+        </div>
+        <span class="nota">Línea de 2 px, formas simples, sin relleno salvo el rayo del logo.</span>
+      </div>
+      <div class="caja">
+        <h3>Componentes</h3>
+        <div class="demo"><span class="btn principal">Comenzar</span><span class="btn secundario">← Volver</span></div>
+        <div class="demo"><span class="seg"><span class="on">Explotado</span><span>Despiece</span></span><span class="etq">Núcleo cósmico</span></div>
+        <div class="demo"><input type="range" value="60" aria-label="Ejemplo de deslizador"></div>
+        <span class="nota">Esquinas de 12 px y alto mínimo de 44 px para tocar fácil.</span>
+      </div>
+    </div>
+
+    <div class="bloque">
+      <h3>Fondo</h3>
+      <div class="cielo" aria-hidden="true">
+        <i style="left:8%;top:20%"></i><i style="left:22%;top:72%"></i><i style="left:40%;top:14%"></i><i style="left:78%;top:80%"></i><i style="left:90%;top:26%"></i><i style="left:62%;top:62%"></i>
+        <span class="aro"></span><span class="nucleo"></span>
+      </div>
+      <span class="nota">Cielo nocturno con estrellas sueltas y brillos violeta y azul. El núcleo brillante es el centro de atención.</span>
+    </div>
+  </section>
+
+  <!-- ===== 02 CÓMO SE USA ===== -->
+  <section id="uso" class="env">
+    <div class="titulo-sec"><span class="n">02</span><h2>Cómo se usa</h2></div>
+
+    <div class="pasos">
+      <div><b>1. Comenzar</b>Toca el botón de la portada.</div>
+      <div><b>2. Elegir</b>Artefacto de Nano o Gráficos y mapas.</div>
+      <div><b>3. Explorar</b>← Volver regresa un paso; ? abre este manual.</div>
+    </div>
+
+    <h3>Modos del artefacto</h3>
+    <ul class="modos">
+      <li><svg viewBox="0 0 26 26"><ellipse cx="13" cy="13" rx="7" ry="11" fill="none" stroke="currentColor" stroke-width="2"/><path d="M13 3 V23 M13 13 H19" fill="none" stroke="currentColor" stroke-width="1.5"/></svg><span><b>Vista general</b> · la rueda completa; gírala con el mouse.</span></li>
+      <li><svg viewBox="0 0 26 26"><rect x="3" y="3" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"/><rect x="9" y="9" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="3 2"/></svg><span><b>Transparencia</b> · ve las piezas de adentro.</span></li>
+      <li><svg viewBox="0 0 26 26"><circle cx="11" cy="11" r="7.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M16.5 16.5 L23 23" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg><span><b>Acercamiento</b> · elige una pieza y acércate.</span></li>
+      <li><svg viewBox="0 0 26 26"><path d="M13 3 A10 10 0 0 1 13 23 Z" fill="currentColor" fill-opacity=".3"/><circle cx="13" cy="13" r="10" fill="none" stroke="currentColor" stroke-width="2"/><path d="M13 1 V25" stroke="currentColor" stroke-width="2" stroke-dasharray="3 2"/></svg><span><b>Corte</b> · longitudinal o transversal; mueve el plano.</span></li>
+      <li><svg viewBox="0 0 26 26"><rect x="2" y="7" width="5" height="12" fill="none" stroke="currentColor" stroke-width="2"/><rect x="10.5" y="4" width="5" height="18" fill="none" stroke="currentColor" stroke-width="2"/><rect x="19" y="7" width="5" height="12" fill="none" stroke="currentColor" stroke-width="2"/></svg><span><b>Despiece</b> · explotado sobre el eje o todas las piezas en fila.</span></li>
+    </ul>
+    <span class="nota">Arrastra para girar · rueda del mouse o pellizco para acercar · toca una pieza para ver su nombre.</span>
+  </section>
+</main>
+
+<footer>
+  <div class="env">Agente Nano · Manual de usuario · <a href="index.html">Volver al programa</a></div>
+</footer>
+</body>
+</html>
